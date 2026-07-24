@@ -3,7 +3,7 @@
 The Imbalance Conjecture states that, for every finite simple graph $G$ with $d_G(u) \ne d_G(v)$ on each edge $uv$, the multiset
 
 $$
-\left\{\,\lvert d_G(u)-d_G(v)\rvert : uv \in E(G)\,\right\}
+\left\lbrace \lvert d_G(u)-d_G(v)\rvert : uv \in E(G) \right\rbrace
 $$
 
 is the degree multiset of a finite simple graph.
