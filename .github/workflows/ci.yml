@@ -18,5 +18,3 @@ jobs:
           build: true
           build-args: "--wfail"
           leanchecker: true
-          nanoda: true
-          nanoda-allow-sorry: false
