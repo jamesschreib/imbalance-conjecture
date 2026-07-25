@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this formalization, please cite it using the metadata below."
+title: "Lean 4 Formalization of the Imbalance Conjecture"
+authors:
+  - family-names: "Schreib"
+    given-names: "James Alexander"
+    affiliation: "New York University"
+    email: "jas10320@nyu.edu"
+    orcid: "https://orcid.org/0009-0005-1048-0209"
+type: software
+version: "1.0.0"
+license: "Apache-2.0"
+repository-code: "https://github.com/jamesschreib/imbalance-conjecture"
+keywords:
+  - "graph theory"
+  - "formal verification"
+  - "Lean 4"
