@@ -1,0 +1,103 @@
+name: Class 22 matching-strengthened pilot
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'class22/class22_matching.cpp'
+      - 'class22/make_matching_case.py'
+      - 'class22/audit_matching.py'
+      - '.github/workflows/class22-matching-pilot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        rep: [4370, 4371, 4374, 4380]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and audit strengthened instance
+        run: |
+          set -euxo pipefail
+          g++ -O3 -DNDEBUG -std=c++20 class22/class22_matching.cpp -o class22/genmatch
+          g++ -O3 -DNDEBUG -std=c++20 class22/triple_classes.cpp -o class22/triples
+          class22/triples | tee class22/triple_classes.out
+          grep -q '^GOOD_STATES 10090 CLASSES 62$' class22/triple_classes.out
+          python3 class22/audit_matching.py | tee class22/matching_audit.out
+          grep -q '^MATCHING REDUCTION AUDIT PASSED' class22/matching_audit.out
+          class22/genmatch class22/base.cnf 2> class22/generator.log
+          grep -q '^p cnf 1305051 5375837$' class22/base.cnf
+          sha256sum class22/base.cnf | tee class22/base.sha256
+
+      - name: Construct canonical matching case
+        run: |
+          set -euxo pipefail
+          python3 class22/make_matching_case.py class22/base.cnf '${{ matrix.rep }}' class22/case.cnf | tee class22/case.json
+          grep -q '^p cnf 1305051 5375846$' class22/case.cnf
+          sha256sum class22/case.cnf | tee class22/case.sha256
+          rm class22/base.cnf
+
+      - name: Build proof-producing solver and checker
+        run: |
+          set -euxo pipefail
+          git clone --depth 1 --branch rel-4.0.3 https://github.com/arminbiere/kissat.git class22/kissat
+          (cd class22/kissat && ./configure && make -j2)
+          git clone --depth 1 https://github.com/marijnheule/drat-trim.git class22/drat-trim
+          make -C class22/drat-trim -j2
+
+      - name: Solve and independently verify
+        id: solve
+        shell: bash
+        run: |
+          set +e
+          cd class22
+          /usr/bin/time -v timeout --signal=TERM --kill-after=30s 900s kissat/build/kissat case.cnf proof.drat > solve.log 2> solve.err
+          solver_rc=$?
+          echo "solver_rc=$solver_rc" | tee status.txt
+          terminal=UNKNOWN
+          if grep -q '^s UNSATISFIABLE' solve.log; then
+            terminal=UNSAT_REPORTED
+            /usr/bin/time -v timeout --signal=TERM --kill-after=30s 1200s drat-trim/drat-trim case.cnf proof.drat > check.log 2> check.err
+            check_rc=$?
+            echo "check_rc=$check_rc" | tee -a status.txt
+            if test $check_rc -eq 0 && grep -q 'VERIFIED' check.log; then
+              terminal=UNSAT_VERIFIED
+              gzip -9 proof.drat
+            fi
+          elif grep -q '^s SATISFIABLE' solve.log; then
+            terminal=SAT_REPORTED
+            python3 verify_model.py solve.log verified_model.json > verify.log 2> verify.err
+            verify_rc=$?
+            echo "verify_rc=$verify_rc" | tee -a status.txt
+            if test $verify_rc -eq 0 && grep -q 'VERIFIED SAT APN PERMUTATION' verify.log; then terminal=SAT_VERIFIED; fi
+          else
+            rm -f proof.drat
+          fi
+          echo "terminal=$terminal" | tee -a status.txt
+          echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Package result
+        if: always()
+        run: |
+          set -euxo pipefail
+          cd class22
+          mkdir -p result-${{ matrix.rep }}
+          cp case.json case.sha256 generator.log triple_classes.out matching_audit.out solve.log solve.err status.txt result-${{ matrix.rep }}/ || true
+          cp check.log check.err proof.drat.gz verified_model.json verify.log verify.err result-${{ matrix.rep }}/ 2>/dev/null || true
+          sha256sum result-${{ matrix.rep }}/* > result-${{ matrix.rep }}/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: class22-matching-${{ matrix.rep }}-${{ steps.solve.outputs.terminal }}
+          path: class22/result-${{ matrix.rep }}
+          compression-level: 0
+          retention-days: 7
