@@ -1,0 +1,93 @@
+name: Class 22 native-XOR pilot
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'class22/class22_xcnf.cpp'
+      - 'class22/make_xcase.py'
+      - '.github/workflows/class22-xor-pilot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        rep: [4370, 4371, 4374, 4380]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and audit native-XOR instance
+        run: |
+          set -euxo pipefail
+          g++ -O3 -DNDEBUG -std=c++20 class22/class22_xcnf.cpp -o class22/genx
+          g++ -O3 -DNDEBUG -std=c++20 class22/triple_classes.cpp -o class22/triples
+          class22/triples | tee class22/triple_classes.out
+          grep -q '^GOOD_STATES 10090 CLASSES 62$' class22/triple_classes.out
+          class22/genx class22/base.xcnf 2> class22/generator.log
+          grep -q '^p cnf 1240117 1422798$' class22/base.xcnf
+          test "$(grep -c '^x ' class22/base.xcnf)" = 1239572
+          sha256sum class22/base.xcnf | tee class22/base.sha256
+
+      - name: Construct canonical XOR case
+        run: |
+          set -euxo pipefail
+          python3 class22/make_xcase.py class22/base.xcnf '${{ matrix.rep }}' class22/case.xcnf | tee class22/case.json
+          grep -q '^p cnf 1240117 1422807$' class22/case.xcnf
+          sha256sum class22/case.xcnf | tee class22/case.sha256
+          rm class22/base.xcnf
+
+      - name: Build CryptoMiniSat
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgmp-dev zlib1g-dev
+          git clone --depth 1 https://github.com/msoos/cryptominisat.git class22/cms
+          cmake -S class22/cms -B class22/cms/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake --build class22/cms/build -j2
+
+      - name: Solve native-XOR case
+        id: solve
+        shell: bash
+        run: |
+          set +e
+          cd class22
+          cmsbin=cms/build/cryptominisat5
+          /usr/bin/time -v timeout --signal=TERM --kill-after=30s 900s "$cmsbin" --verb 1 --autodisablegauss 0 --zero-exit-status case.xcnf > solve.log 2> solve.err
+          solver_rc=$?
+          echo "solver_rc=$solver_rc" | tee status.txt
+          terminal=UNKNOWN
+          if grep -q '^s UNSATISFIABLE' solve.log; then terminal=UNSAT_REPORTED; fi
+          if grep -q '^s SATISFIABLE' solve.log; then
+            terminal=SAT_REPORTED
+            python3 verify_model.py solve.log verified_model.json > verify.log 2> verify.err
+            verify_rc=$?
+            echo "verify_rc=$verify_rc" | tee -a status.txt
+            if test $verify_rc -eq 0 && grep -q 'VERIFIED SAT APN PERMUTATION' verify.log; then terminal=SAT_VERIFIED; fi
+          fi
+          echo "terminal=$terminal" | tee -a status.txt
+          echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Package result
+        if: always()
+        run: |
+          set -euxo pipefail
+          cd class22
+          mkdir -p xor-result-${{ matrix.rep }}
+          cp case.json case.sha256 generator.log triple_classes.out solve.log solve.err status.txt xor-result-${{ matrix.rep }}/ || true
+          cp verified_model.json verify.log verify.err xor-result-${{ matrix.rep }}/ 2>/dev/null || true
+          sha256sum xor-result-${{ matrix.rep }}/* > xor-result-${{ matrix.rep }}/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: class22-xor-${{ matrix.rep }}-${{ steps.solve.outputs.terminal }}
+          path: class22/xor-result-${{ matrix.rep }}
+          compression-level: 0
+          retention-days: 7
