@@ -1,0 +1,118 @@
+name: Class 22 Kissat portfolio
+
+on:
+  pull_request:
+    paths:
+      - 'class22/**'
+      - '.github/workflows/class22-kissat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  solve:
+    name: Kissat z=${{ matrix.z }}, w=${{ matrix.w }}, s=${{ matrix.simple }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      max-parallel: 23
+      matrix:
+        include:
+          - { z: 3,   w: 5, simple: 0 }
+          - { z: 7,   w: 5, simple: 0 }
+          - { z: 9,   w: 3, simple: 0 }
+          - { z: 17,  w: 3, simple: 1 }
+          - { z: 18,  w: 3, simple: 1 }
+          - { z: 19,  w: 3, simple: 1 }
+          - { z: 21,  w: 3, simple: 1 }
+          - { z: 23,  w: 3, simple: 1 }
+          - { z: 25,  w: 3, simple: 1 }
+          - { z: 26,  w: 3, simple: 1 }
+          - { z: 27,  w: 3, simple: 1 }
+          - { z: 28,  w: 3, simple: 1 }
+          - { z: 29,  w: 3, simple: 1 }
+          - { z: 30,  w: 3, simple: 1 }
+          - { z: 50,  w: 3, simple: 1 }
+          - { z: 53,  w: 3, simple: 1 }
+          - { z: 57,  w: 3, simple: 1 }
+          - { z: 82,  w: 3, simple: 1 }
+          - { z: 83,  w: 3, simple: 1 }
+          - { z: 86,  w: 3, simple: 1 }
+          - { z: 89,  w: 3, simple: 1 }
+          - { z: 105, w: 3, simple: 1 }
+          - { z: 183, w: 3, simple: 1 }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build deterministic CNF generator
+        run: |
+          g++ -O3 -march=x86-64-v3 -DNDEBUG -std=c++20 \
+            class22/class22_four_cnf.cpp -o class22_four_cnf
+
+      - name: Build official Kissat 4.0.4
+        run: |
+          git clone --depth 1 --branch rel-4.0.4 https://github.com/arminbiere/kissat.git
+          cd kissat
+          ./configure
+          make -j2
+          build/kissat --version
+
+      - name: Generate exact canonical CNF
+        run: |
+          mkdir -p result
+          ./class22_four_cnf '${{ matrix.z }}' '${{ matrix.w }}' '${{ matrix.simple }}' result/case.cnf \
+            > result/generator.stdout 2> result/generator.stderr
+          sha256sum result/case.cnf class22/class22_four_cnf.cpp > result/SHA256SUMS
+          head -4 result/case.cnf | tee result/header.txt
+          cat result/generator.stderr
+
+      - name: Solve exact CNF
+        id: solve
+        shell: bash
+        run: |
+          set +e
+          /usr/bin/time -v timeout --signal=TERM --kill-after=30s 300m \
+            kissat/build/kissat result/case.cnf \
+            > result/solver.stdout 2> result/solver.stderr
+          rc=$?
+          set -e
+          echo "$rc" > result/exit_code.txt
+          {
+            echo "z=${{ matrix.z }}"
+            echo "w=${{ matrix.w }}"
+            echo "simple=${{ matrix.simple }}"
+            echo "exit_code=$rc"
+            kissat/build/kissat --version
+          } > result/manifest.txt
+          tail -100 result/solver.stdout || true
+          tail -100 result/solver.stderr || true
+          if [[ "$rc" == "10" || "$rc" == "20" ]]; then
+            echo "terminal=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "terminal=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Remove large deterministic CNF before artifact upload
+        if: always()
+        run: rm -f result/case.cnf
+
+      - name: Upload retained case result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kissat-z${{ matrix.z }}-w${{ matrix.w }}-s${{ matrix.simple }}
+          path: result/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require terminal SAT or UNSAT
+        if: steps.solve.outputs.terminal != 'true'
+        run: |
+          echo 'Kissat did not terminate with SAT (10) or UNSAT (20).' >&2
+          exit 1
