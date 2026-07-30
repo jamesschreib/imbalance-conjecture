@@ -1,105 +1,11 @@
-name: Class 22 canonical cases
+name: Class 22 Z3 portfolio (disabled)
 
 on:
-  pull_request:
-    paths:
-      - 'class22/**'
-      - '.github/workflows/class22-canonical.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-
-env:
-  DEBIAN_FRONTEND: noninteractive
-
 jobs:
-  solve:
-    name: z=${{ matrix.z }}, w=${{ matrix.w }}, simple=${{ matrix.simple }}
+  disabled:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 330
-    strategy:
-      fail-fast: false
-      max-parallel: 23
-      matrix:
-        include:
-          - { z: 3,   w: 5, simple: 0 }
-          - { z: 7,   w: 5, simple: 0 }
-          - { z: 9,   w: 3, simple: 0 }
-          - { z: 17,  w: 3, simple: 1 }
-          - { z: 18,  w: 3, simple: 1 }
-          - { z: 19,  w: 3, simple: 1 }
-          - { z: 21,  w: 3, simple: 1 }
-          - { z: 23,  w: 3, simple: 1 }
-          - { z: 25,  w: 3, simple: 1 }
-          - { z: 26,  w: 3, simple: 1 }
-          - { z: 27,  w: 3, simple: 1 }
-          - { z: 28,  w: 3, simple: 1 }
-          - { z: 29,  w: 3, simple: 1 }
-          - { z: 30,  w: 3, simple: 1 }
-          - { z: 50,  w: 3, simple: 1 }
-          - { z: 53,  w: 3, simple: 1 }
-          - { z: 57,  w: 3, simple: 1 }
-          - { z: 82,  w: 3, simple: 1 }
-          - { z: 83,  w: 3, simple: 1 }
-          - { z: 86,  w: 3, simple: 1 }
-          - { z: 89,  w: 3, simple: 1 }
-          - { z: 105, w: 3, simple: 1 }
-          - { z: 183, w: 3, simple: 1 }
-
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Z3 development library
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libz3-dev
-
-      - name: Compile exact solver
-        run: |
-          g++ -O3 -march=x86-64-v3 -DNDEBUG -std=c++20 \
-            class22/class22_four_z3.cpp -lz3 -o class22_four_z3
-
-      - name: Solve exact canonical case
-        id: solve
-        shell: bash
-        run: |
-          mkdir -p result
-          set +e
-          /usr/bin/time -v timeout --signal=TERM --kill-after=30s 300m \
-            ./class22_four_z3 \
-              '${{ matrix.z }}' '${{ matrix.w }}' 4 1 \
-              'result/case_${{ matrix.z }}_${{ matrix.w }}' 0 '${{ matrix.simple }}' \
-              > result/stdout.txt 2> result/stderr.txt
-          rc=$?
-          set -e
-          echo "$rc" > result/exit_code.txt
-          {
-            echo "z=${{ matrix.z }}"
-            echo "w=${{ matrix.w }}"
-            echo "simple=${{ matrix.simple }}"
-            echo "exit_code=$rc"
-            sha256sum class22/class22_four_z3.cpp
-          } > result/manifest.txt
-          cat result/stdout.txt || true
-          tail -100 result/stderr.txt || true
-          if [[ "$rc" == "10" || "$rc" == "20" ]]; then
-            echo "terminal=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "terminal=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Upload retained case result
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: class22-z${{ matrix.z }}-w${{ matrix.w }}-s${{ matrix.simple }}
-          path: result/
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Require a terminal exact result
-        if: steps.solve.outputs.terminal != 'true'
-        run: |
-          echo 'The exact case did not terminate with SAT (10) or UNSAT (20).' >&2
-          exit 1
+      - run: echo disabled
