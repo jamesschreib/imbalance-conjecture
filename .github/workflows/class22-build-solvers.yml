@@ -1,0 +1,48 @@
+name: Build Class 22 SAT toolchain
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/class22-build-solvers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Kissat 4.0.4
+        run: |
+          git clone --depth 1 --branch rel-4.0.4 https://github.com/arminbiere/kissat.git
+          cd kissat
+          ./configure
+          make -j2
+          build/kissat --version
+      - name: Build CaDiCaL
+        run: |
+          git clone --depth 1 https://github.com/arminbiere/cadical.git
+          cd cadical
+          ./configure
+          make -j2
+          build/cadical --version
+      - name: Build DRAT-trim
+        run: |
+          git clone --depth 1 https://github.com/marijnheule/drat-trim.git
+          make -C drat-trim -j2
+      - name: Package binaries
+        run: |
+          mkdir -p sat-toolchain
+          cp kissat/build/kissat sat-toolchain/
+          cp cadical/build/cadical sat-toolchain/
+          cp drat-trim/drat-trim sat-toolchain/
+          sha256sum sat-toolchain/* > sat-toolchain/SHA256SUMS
+          file sat-toolchain/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: class22-sat-toolchain-linux-x86_64
+          path: sat-toolchain/
+          retention-days: 30
