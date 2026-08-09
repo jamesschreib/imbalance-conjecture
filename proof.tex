@@ -1,0 +1,134 @@
+\documentclass[11pt,reqno]{amsart}
+
+\pdfinfoomitdate=1
+\pdftrailerid{}
+\pdfsuppressptexinfo=-1
+
+\usepackage{microtype}
+\microtypesetup{expansion=false}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{
+  pdfauthor={},
+  pdftitle={},
+  pdfsubject={},
+  pdfkeywords={},
+  pdfcreator={},
+  pdfproducer={}
+}
+
+\setlength{\emergencystretch}{1em}
+\numberwithin{equation}{section}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\newcommand{\doi}[1]{\href{https://doi.org/#1}{\nolinkurl{#1}}}
+
+\date{July 26, 2026}
+
+\begin{document}
+
+\section{Proof}
+
+\begin{theorem}[Imbalance conjecture]
+Let $G$ be a finite simple graph such that $d_G(u)\ne d_G(v)$ for every
+edge $uv$.  Then the multiset
+\[
+  \bigl(\lvert d_G(u)-d_G(v)\rvert\bigr)_{uv\in E(G)}
+\]
+is the degree multiset of a finite simple graph.
+\end{theorem}
+
+\begin{proof}
+Write $d(v)=d_G(v)$, $D=\max_{v\in V(G)}d(v)$, and
+$\iota(uv)=\lvert d(u)-d(v)\rvert$.  For $A\subseteq E(G)$ with
+$\lvert A\rvert=k$, put
+\[
+  T_A=\sum_{e\in E(G)\setminus A}\min\{k,\iota(e)\}.
+\]
+We first prove
+\begin{equation}\label{eq:capacity}
+  T_A\ge k(D-k)^+,
+\end{equation}
+where $q^+=\max\{q,0\}$.
+
+The claim is immediate when $k=0$ or $k\ge D$.  Suppose that
+$0<k<D$, set $r=D-k$, and choose a vertex $x$ of degree $D$.  Let $a$
+be the number of edges of $A$ incident with $x$.  Of the $D-a$ edges at
+$x$ outside $A$, choose $r$ and let $R$ be their opposite endpoints; let
+$X$ be the opposite endpoints of the other such edges.  Thus
+$\lvert X\rvert=k-a$.
+
+For $z\in R$, maximality of $d(x)$ and the hypothesis on adjacent
+degrees give $d(z)<D$ and $\iota(xz)=D-d(z)$.  Consequently,
+\begin{equation}\label{eq:reservoir}
+  \min\{k,\iota(xz)\}+(d(z)-r)^+=k.
+\end{equation}
+Indeed, if $d(z)\le r$, the two terms are $k$ and $0$; otherwise they
+are $D-d(z)$ and $d(z)-r$.
+
+Set $\rho=\sum_{z\in R}(d(z)-r)^+$.  Call an edge an escape edge if it
+has one endpoint in $R$ and the other outside $R\cup\{x\}$, and let $F$
+be the set of escape edges.  For each $z\in R$, at most $r$ possible
+neighbors of $z$ lie in $R\cup\{x\}$.  Since every escape edge has
+exactly one endpoint in $R$, summing over $R$ gives
+\begin{equation}\label{eq:escape}
+  \lvert F\rvert\ge\rho.
+\end{equation}
+
+By \eqref{eq:reservoir}, the $r$ chosen edges at $x$ contribute
+$rk-\rho$ to $T_A$.  No edge of $F$ is incident with $x$, while exactly
+$a$ edges of $A$ are incident with $x$; hence, by \eqref{eq:escape}, at
+least $(\rho-(k-a))^+$ escape edges lie outside $A$.  Each contributes at
+least one to $T_A$, as does each of the $k-a$ edges from $x$ to $X$.
+These three groups of edges are pairwise disjoint, so
+\[
+  T_A\ge rk-\rho+(k-a)+(\rho-(k-a))^+\ge rk.
+\]
+As $r=D-k$, this proves \eqref{eq:capacity}.
+
+Every edge has imbalance at most $D-1$: both endpoints have positive
+degree at most $D$.  It follows that every $A\subseteq E(G)$ of size $k$
+satisfies
+\begin{equation}\label{eq:subset}
+  \sum_{e\in A}\iota(e)
+  \le k(k-1)+\sum_{e\in E(G)\setminus A}\min\{k,\iota(e)\}.
+\end{equation}
+If $D\le k$, the left side is at most $k(D-1)\le k(k-1)$.  If $k<D$,
+it is at most
+\[
+  k(D-1)=k(k-1)+k(D-k),
+\]
+and \eqref{eq:capacity} supplies the last term in \eqref{eq:subset}.
+
+The sum of all imbalances is even.  Since $\lvert p-q\rvert\equiv p+q$
+modulo two, summing first over edges and then over incidences gives
+\[
+  \sum_{uv\in E(G)}\lvert d(u)-d(v)\rvert
+  \equiv \sum_{uv\in E(G)}(d(u)+d(v))
+  =\sum_{v\in V(G)}d(v)^2.
+\]
+But $d(v)^2\equiv d(v)$ modulo two, and
+\[
+  \sum_{v\in V(G)}d(v)=2\lvert E(G)\rvert,
+\]
+so the imbalance sum is even.
+
+If $E(G)$ is empty, the conclusion is immediate.  Otherwise, write the
+imbalances in nonincreasing order as $s_1\ge\dots\ge s_m$, where
+$m=\lvert E(G)\rvert$.  For $1\le k\le m$, choose $A$ to consist of
+$k$ edges carrying $s_1,\dots,s_k$.  Then \eqref{eq:subset} says
+\[
+  \sum_{i=1}^{k}s_i
+  \le k(k-1)+\sum_{i=k+1}^{m}\min\{k,s_i\}.
+\]
+Together with the even sum just proved, these are precisely the
+Erd\H{o}s--Gallai conditions.  Their sufficiency shows that
+$(s_1,\dots,s_m)$ is graphic.
+\end{proof}
+
+\end{document}
