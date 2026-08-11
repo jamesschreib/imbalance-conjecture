@@ -8,4 +8,4 @@ $$
 
 is the degree multiset of a finite simple graph.
 
-Formalized in Lean 4.30, including a self-contained proof of Erdős–Gallai sufficiency. Reproduce the verification by running `lake build`.
+The proof is in [`proof.pdf`](proof.pdf), which is formalized in Lean 4.30, including a self-contained proof of Erdős–Gallai sufficiency. Reproduce the verification by running `lake build`.
